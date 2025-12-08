@@ -35,12 +35,34 @@ export default function QAView() {
     setQ("");
   }
 
+  function exportHistory() {
+    if (!selectedDocumentId) return;
+
+    const data = history.map(({ question, answer, createdAt }) => ({
+      question,
+      answer,
+      createdAt,
+    }));
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${selectedDoc?.name ?? "qa_history"}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <Paper sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
         {selectedDoc ? selectedDoc.name : "Select a document"}
       </Typography>
 
+      {/* Question input form with animation */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -73,14 +95,35 @@ export default function QAView() {
 
       <Divider sx={{ mb: 2 }} />
 
-      <Typography variant="subtitle1">Q&A History</Typography>
+      {/* Q&A header with Export button on the same line */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 1,
+        }}
+      >
+        <Typography variant="subtitle1">Q&A History</Typography>
+
+        {history.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+          >
+            <Button variant="outlined" onClick={exportHistory}>
+              Export JSON
+            </Button>
+          </motion.div>
+        )}
+      </Box>
 
       {history.length === 0 && (
         <Typography color="text.secondary" variant="body2">
           No Q&A yet
         </Typography>
       )}
-
       <AnimatePresence>
         {history.map((h) => (
           <motion.div
