@@ -1,9 +1,8 @@
-import React from 'react'
-import { Snackbar, Alert } from '@mui/material'
-import { useDocumentContext } from '../context/DocumentContext'
+import { Snackbar, Alert } from "@mui/material";
+import { useDocumentContext } from "../context/DocumentContext";
 
 export default function Toasts() {
-  const { toasts, removeToast } = useDocumentContext()
+  const { toasts, removeToast } = useDocumentContext();
 
   return (
     <>
@@ -13,13 +12,31 @@ export default function Toasts() {
           open
           autoHideDuration={3000}
           onClose={() => removeToast(i)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          sx={{
+            mb: 6,
+          }}
         >
-          <Alert severity="info" onClose={() => removeToast(i)}>
+          <Alert
+            onClose={() => removeToast(i)}
+            severity="info"
+            variant="filled"
+            sx={{
+              fontSize: "1.1rem",
+              fontWeight: "600",
+              padding: "14px 18px",
+              borderRadius: "12px",
+              minWidth: "300px",
+              display: "flex",
+              justifyContent: "center",
+              bgcolor: "#d2cc19ff",
+              color: "white",
+            }}
+          >
             {t}
           </Alert>
         </Snackbar>
       ))}
     </>
-  )
+  );
 }

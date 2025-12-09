@@ -16,6 +16,16 @@ type DocContext = {
 
 const DocumentContext = createContext<DocContext | undefined>(undefined);
 
+function safeSetItem(key: string, value: any) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (err: any) {
+    console.warn("Storage error:", err);
+    return false;
+  }
+}
+
 export function DocumentProvider({ children }: { children: React.ReactNode }) {
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
     try {
@@ -45,20 +55,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     }
   );
 
-  useEffect(() => {
-    localStorage.setItem("docs_v1", JSON.stringify(documents));
-  }, [documents]);
-
-  useEffect(() => {
-    localStorage.setItem("qa_v1", JSON.stringify(qa));
-  }, [qa]);
-
-  useEffect(() => {
-    if (selectedDocumentId)
-      localStorage.setItem("selected_doc", selectedDocumentId);
-    else localStorage.removeItem("selected_doc");
-  }, [selectedDocumentId]);
-
   const [toasts, setToasts] = useState<string[]>([]);
 
   useEffect(() => {
@@ -77,11 +73,44 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     setToasts((t) => t.filter((_, i) => i !== index));
   }
 
-  function addFileAndUpload(file: File) {
-    const reader = new FileReader();
+  useEffect(() => {
+    if (!safeSetItem("docs_v1", documents)) {
+      pushToast("Storage full — document list not saved.");
+    }
+  }, [documents]);
 
+  useEffect(() => {
+    if (!safeSetItem("qa_v1", qa)) {
+      pushToast("Storage full — Q&A history not saved.");
+    }
+  }, [qa]);
+
+  useEffect(() => {
+    try {
+      if (selectedDocumentId)
+        localStorage.setItem("selected_doc", selectedDocumentId);
+      else localStorage.removeItem("selected_doc");
+    } catch {
+      pushToast("Unable to save selected document.");
+    }
+  }, [selectedDocumentId]);
+
+  function addFileAndUpload(file: File) {
+    const MAX_FILE_SIZE = 2 * 1024 * 1024;
+
+    if (file.size > MAX_FILE_SIZE) {
+      pushToast("File too large. Max allowed size is 2 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
     reader.onload = () => {
       const fileText = reader.result as string;
+
+      if (fileText.length > 800000) {
+        pushToast("Document is too large to store locally.");
+        return;
+      }
 
       const tempId = `temp-${Date.now()}`;
 
@@ -116,7 +145,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     };
 
     setQa((q) => [placeholder, ...q]);
-    pushToast("Sending to Gemini...");
+    pushToast("Sending to AI...");
 
     const doc = documents.find((d) => d.id === documentId);
 
