@@ -6,6 +6,7 @@ export interface DocumentItem {
   status: 'uploading' | 'uploaded' | 'failed'
   progress?: number
   content?: string
+  type?: string  
 }
 
 export interface QAEntry {
