@@ -21,11 +21,11 @@ Export Q&A as JSON
 Toast notifications
 Gemini AI responses via backend
 
-## Keyboard Shortcuts:
+# Keyboard Shortcuts:
 Alt + Q Focus question input
 Ctrl/Cmd Enter Ask question
 
-## Installation
+# Installation
 Frontend
 git clone git@github.com:AndriesMathenjwa/document-qa-app.git
 cd document-qa-frontend
