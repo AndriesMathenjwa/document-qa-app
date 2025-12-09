@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { DocumentItem, QAEntry } from "../types";
 import { askGemini } from "../lib/gemini";
 
+// --- Types ---
 type DocContext = {
   documents: DocumentItem[];
   qa: QAEntry[];
@@ -19,6 +20,7 @@ type DocContext = {
 
 const DocumentContext = createContext<DocContext | undefined>(undefined);
 
+// --- Local Storage Helpers ---
 function safeSetItem(key: string, value: any) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -27,7 +29,6 @@ function safeSetItem(key: string, value: any) {
     return false;
   }
 }
-
 function safeRemoveItem(key: string) {
   try {
     localStorage.removeItem(key);
@@ -37,6 +38,47 @@ function safeRemoveItem(key: string) {
   }
 }
 
+// --- Simulated Upload Function ---
+function simulateUpload(
+  file: File,
+  onProgress: (p: number) => void
+): Promise<DocumentItem> {
+  return new Promise((resolve, reject) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    let p = 0;
+    const iv = setInterval(() => {
+      p += Math.floor(Math.random() * 20) + 10;
+      if (p >= 100) {
+        p = 100;
+        onProgress(p);
+        clearInterval(iv);
+        setTimeout(() => {
+          resolve({
+            id,
+            name: file.name,
+            size: file.size,
+            uploadedAt: new Date().toISOString(),
+            status: "uploaded",
+            progress: 100,
+            type: file.type,
+          });
+        }, 250);
+      } else {
+        onProgress(p);
+      }
+    }, 180);
+
+    // Tiny chance to fail
+    setTimeout(() => {
+      if (Math.random() < 0.03) {
+        clearInterval(iv);
+        reject(new Error("Simulated network error"));
+      }
+    }, 600);
+  });
+}
+
+// --- Provider ---
 export function DocumentProvider({ children }: { children: React.ReactNode }) {
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
     try {
@@ -56,20 +98,18 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
-    () => {
-      try {
-        return localStorage.getItem("selected_doc") || null;
-      } catch {
-        return null;
-      }
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("selected_doc") || null;
+    } catch {
+      return null;
     }
-  );
+  });
 
-  const [searchQuery, setSearchQuery] = useState('');
-
+  const [searchQuery, setSearchQuery] = useState("");
   const [toasts, setToasts] = useState<string[]>([]);
 
+  // --- Toast auto-remove ---
   useEffect(() => {
     if (toasts.length === 0) return;
     const id = setTimeout(() => {
@@ -78,15 +118,11 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(id);
   }, [toasts]);
 
-  function pushToast(msg: string) {
-    setToasts((t) => [...t, msg]);
-  }
-
-  function removeToast(index: number) {
+  const pushToast = (msg: string) => setToasts((t) => [...t, msg]);
+  const removeToast = (index: number) =>
     setToasts((t) => t.filter((_, i) => i !== index));
-  }
 
-  function clearAllData() {
+  const clearAllData = () => {
     setDocuments([]);
     setQa([]);
     setSelectedDocumentId(null);
@@ -94,68 +130,82 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     safeRemoveItem("qa_v1");
     safeRemoveItem("selected_doc");
     pushToast("All data cleared from local storage");
-  }
+  };
 
+  // --- Persist local storage ---
   useEffect(() => {
-    if (!safeSetItem("docs_v1", documents)) {
+    if (!safeSetItem("docs_v1", documents))
       pushToast("Storage full — document list not saved.");
-    }
   }, [documents]);
 
   useEffect(() => {
-    if (!safeSetItem("qa_v1", qa)) {
-      pushToast("Storage full — Q&A history not saved.");
-    }
+    if (!safeSetItem("qa_v1", qa)) pushToast("Storage full — Q&A history not saved.");
   }, [qa]);
 
   useEffect(() => {
     try {
-      if (selectedDocumentId)
-        localStorage.setItem("selected_doc", selectedDocumentId);
+      if (selectedDocumentId) localStorage.setItem("selected_doc", selectedDocumentId);
       else localStorage.removeItem("selected_doc");
     } catch {
       pushToast("Unable to save selected document.");
     }
   }, [selectedDocumentId]);
 
-  function addFileAndUpload(file: File) {
-    const MAX_FILE_SIZE = 2 * 1024 * 1024;
+  // --- Add file & simulate upload ---
+  const addFileAndUpload = (file: File) => {
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
     if (file.size > MAX_FILE_SIZE) {
       pushToast("File too large. Max allowed size is 2 MB.");
       return;
     }
 
+    const tempId = `temp-${Date.now()}`;
+    const placeholder: DocumentItem = {
+      id: tempId,
+      name: file.name,
+      size: file.size,
+      uploadedAt: new Date().toISOString(),
+      status: "uploading",
+      progress: 0,
+      type: file.type,
+      content: "",
+    };
+
+    setDocuments((d) => [placeholder, ...d]);
+    setSelectedDocumentId(tempId);
+    pushToast(`Uploading ${file.name}...`);
+
     const reader = new FileReader();
     reader.onload = () => {
       const fileText = reader.result as string;
-      if (fileText.length > 800000) {
-        pushToast("Document is too large to store locally.");
-        return;
-      }
 
-      const tempId = `temp-${Date.now()}`;
-      const placeholder: DocumentItem = {
-        id: tempId,
-        name: file.name,
-        size: file.size,
-        uploadedAt: new Date().toISOString(),
-        status: "uploaded",
-        progress: 100,
-        type: file.type,
-        content: fileText,
-      };
-
-      setDocuments((d) => [placeholder, ...d]);
-      pushToast(`Loaded ${file.name}`);
-      setSelectedDocumentId(tempId);
+      simulateUpload(file, (p) => {
+        setDocuments((docs) =>
+          docs.map((d) => (d.id === tempId ? { ...d, progress: p } : d))
+        );
+      })
+        .then((uploadedDoc) => {
+          setDocuments((docs) =>
+            docs.map((d) =>
+              d.id === tempId ? { ...uploadedDoc, content: fileText, progress: 100 } : d
+            )
+          );
+          pushToast(`${file.name} uploaded successfully`);
+        })
+        .catch(() => {
+          setDocuments((docs) =>
+            docs.map((d) => (d.id === tempId ? { ...d, status: "failed" } : d))
+          );
+          pushToast(`${file.name} upload failed`);
+        });
     };
 
     reader.readAsText(file);
-  }
+  };
 
-  async function askQuestion(documentId: string, question: string) {
+  // --- Ask AI question ---
+  const askQuestion = async (documentId: string, question: string) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
     const placeholder: QAEntry = {
       id,
       documentId,
@@ -168,12 +218,9 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     pushToast("Sending to AI...");
 
     const doc = documents.find((d) => d.id === documentId);
-
     if (!doc) {
       setQa((prev) =>
-        prev.map((x) =>
-          x.id === id ? { ...x, answer: "Error: Document not found" } : x
-        )
+        prev.map((x) => (x.id === id ? { ...x, answer: "Error: Document not found" } : x))
       );
       return;
     }
@@ -189,7 +236,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
 
     setQa((qarr) => [final, ...qarr.filter((x) => x.id !== id)]);
     pushToast("AI answer ready");
-  }
+  };
 
   const value: DocContext = {
     documents,
@@ -206,16 +253,12 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     setSearchQuery,
   };
 
-  return (
-    <DocumentContext.Provider value={value}>
-      {children}
-    </DocumentContext.Provider>
-  );
+  return <DocumentContext.Provider value={value}>{children}</DocumentContext.Provider>;
 }
 
+// --- Hook ---
 export function useDocumentContext() {
   const ctx = useContext(DocumentContext);
-  if (!ctx)
-    throw new Error("useDocumentContext must be used within DocumentProvider");
+  if (!ctx) throw new Error("useDocumentContext must be used within DocumentProvider");
   return ctx;
 }
