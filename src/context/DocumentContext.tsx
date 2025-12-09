@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { DocumentItem, QAEntry } from "../types";
 import { askGemini } from "../lib/gemini";
 
-// --- Types ---
 type DocContext = {
   documents: DocumentItem[];
   qa: QAEntry[];
@@ -20,7 +19,6 @@ type DocContext = {
 
 const DocumentContext = createContext<DocContext | undefined>(undefined);
 
-// --- Local Storage Helpers ---
 function safeSetItem(key: string, value: any) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -38,7 +36,6 @@ function safeRemoveItem(key: string) {
   }
 }
 
-// --- Simulated Upload Function ---
 function simulateUpload(
   file: File,
   onProgress: (p: number) => void
@@ -68,7 +65,6 @@ function simulateUpload(
       }
     }, 180);
 
-    // Tiny chance to fail
     setTimeout(() => {
       if (Math.random() < 0.03) {
         clearInterval(iv);
@@ -78,7 +74,6 @@ function simulateUpload(
   });
 }
 
-// --- Provider ---
 export function DocumentProvider({ children }: { children: React.ReactNode }) {
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
     try {
@@ -109,7 +104,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [toasts, setToasts] = useState<string[]>([]);
 
-  // --- Toast auto-remove ---
   useEffect(() => {
     if (toasts.length === 0) return;
     const id = setTimeout(() => {
@@ -132,7 +126,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     pushToast("All data cleared from local storage");
   };
 
-  // --- Persist local storage ---
   useEffect(() => {
     if (!safeSetItem("docs_v1", documents))
       pushToast("Storage full — document list not saved.");
@@ -151,9 +144,8 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedDocumentId]);
 
-  // --- Add file & simulate upload ---
   const addFileAndUpload = (file: File) => {
-    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; 
     if (file.size > MAX_FILE_SIZE) {
       pushToast("File too large. Max allowed size is 2 MB.");
       return;
@@ -203,7 +195,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     reader.readAsText(file);
   };
 
-  // --- Ask AI question ---
   const askQuestion = async (documentId: string, question: string) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const placeholder: QAEntry = {
@@ -256,7 +247,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
   return <DocumentContext.Provider value={value}>{children}</DocumentContext.Provider>;
 }
 
-// --- Hook ---
 export function useDocumentContext() {
   const ctx = useContext(DocumentContext);
   if (!ctx) throw new Error("useDocumentContext must be used within DocumentProvider");

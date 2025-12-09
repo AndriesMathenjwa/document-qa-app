@@ -83,13 +83,13 @@ export default function App() {
           </DialogTitle>
           <DialogContent>
             <DialogContentText id="alert-dialog-description">
-              This will remove:
+              This will remove :
               <ul>
                 <li>All uploaded documents ({documents.length} documents)</li>
                 <li>All Q&A history</li>
-                <li>All selected document preferences</li>
+                <li>All selected documents preferences</li>
               </ul>
-              This action cannot be undone. Are you sure you want to continue?
+              This action cannot be undone. Are you sure you want to continue ?
             </DialogContentText>
           </DialogContent>
           <DialogActions>
