@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useDocumentContext } from "../context/DocumentContext";
 import {
   TextField,
@@ -11,20 +11,25 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function QAView() {
-  const { documents, selectedDocumentId, qa, askQuestion } =
+  const { documents, selectedDocumentId, qa, askQuestion, searchQuery } =
     useDocumentContext();
   const [q, setQ] = useState("");
+
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedDoc =
     documents.find((d) => d.id === selectedDocumentId) ?? null;
 
-  const history = useMemo(
-    () =>
-      qa
-        .filter((e) => e.documentId === selectedDocumentId)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [qa, selectedDocumentId]
-  );
+  const history = useMemo(() => {
+    return qa
+      .filter((e) => e.documentId === selectedDocumentId)
+      .filter(
+        (e) =>
+          e.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          e.answer.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [qa, selectedDocumentId, searchQuery]);
 
   async function onSubmit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -56,30 +61,60 @@ export default function QAView() {
     URL.revokeObjectURL(url);
   }
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.altKey && e.key.toLowerCase() === "q") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <Paper sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
         {selectedDoc ? selectedDoc.name : "Select a document"}
       </Typography>
 
-      {/* Question input form with animation */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
         <Box component="form" onSubmit={onSubmit} sx={{ mb: 3 }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              <strong>Keyboard Shortcuts:</strong> Alt+Q = focus input,
+              Ctrl+Enter = submit
+            </Typography>
+          </Box>
           <TextField
             label="Ask a question"
             fullWidth
             multiline
             minRows={2}
             value={q}
+            inputRef={inputRef}
             onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onSubmit();
+              }
+              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                e.preventDefault();
+                onSubmit();
+              }
+            }}
             disabled={!selectedDoc}
           />
 
-          <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}>
+          <Box
+            sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}
+          >
             <Typography variant="caption">{q.length} chars</Typography>
 
             <Button
@@ -93,9 +128,8 @@ export default function QAView() {
         </Box>
       </motion.div>
 
-      <Divider sx={{ mb: 2 }} />
+      <Divider sx={{ mb: 1 }} />
 
-      {/* Q&A header with Export button on the same line */}
       <Box
         sx={{
           display: "flex",
@@ -124,6 +158,7 @@ export default function QAView() {
           No Q&A yet
         </Typography>
       )}
+
       <AnimatePresence>
         {history.map((h) => (
           <motion.div
@@ -133,12 +168,23 @@ export default function QAView() {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
           >
-            <Paper sx={{ p: 2, mt: 2 }}>
-              <Typography>
-                <strong>Q:</strong> {h.question}
+            <Paper
+              sx={{ p: 2, mt: 2, borderRadius: 2, backgroundColor: "#f5f5f5" }}
+            >
+              <Typography sx={{ mb: 1, color: "#111", fontWeight: 600 }}>
+                Q: {h.question}
               </Typography>
-              <Typography sx={{ whiteSpace: "pre-wrap", mt: 1 }}>
-                <strong>A:</strong> {h.answer}
+              <Typography
+                sx={{
+                  whiteSpace: "pre-wrap",
+                  backgroundColor: "#e0f7fa",
+                  p: 1,
+                  borderRadius: 1,
+                  color: "#006064",
+                  mb: 1,
+                }}
+              >
+                A: {h.answer}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {new Date(h.createdAt).toLocaleString()}

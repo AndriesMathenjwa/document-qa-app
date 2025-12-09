@@ -12,6 +12,9 @@ type DocContext = {
   pushToast: (message: string) => void;
   toasts: string[];
   removeToast: (index: number) => void;
+  clearAllData: () => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
 };
 
 const DocumentContext = createContext<DocContext | undefined>(undefined);
@@ -20,8 +23,16 @@ function safeSetItem(key: string, value: any) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
-  } catch (err: any) {
-    console.warn("Storage error:", err);
+  } catch {
+    return false;
+  }
+}
+
+function safeRemoveItem(key: string) {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch {
     return false;
   }
 }
@@ -55,6 +66,8 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     }
   );
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [toasts, setToasts] = useState<string[]>([]);
 
   useEffect(() => {
@@ -71,6 +84,16 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
 
   function removeToast(index: number) {
     setToasts((t) => t.filter((_, i) => i !== index));
+  }
+
+  function clearAllData() {
+    setDocuments([]);
+    setQa([]);
+    setSelectedDocumentId(null);
+    safeRemoveItem("docs_v1");
+    safeRemoveItem("qa_v1");
+    safeRemoveItem("selected_doc");
+    pushToast("All data cleared from local storage");
   }
 
   useEffect(() => {
@@ -97,7 +120,6 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
 
   function addFileAndUpload(file: File) {
     const MAX_FILE_SIZE = 2 * 1024 * 1024;
-
     if (file.size > MAX_FILE_SIZE) {
       pushToast("File too large. Max allowed size is 2 MB.");
       return;
@@ -106,14 +128,12 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     const reader = new FileReader();
     reader.onload = () => {
       const fileText = reader.result as string;
-
       if (fileText.length > 800000) {
         pushToast("Document is too large to store locally.");
         return;
       }
 
       const tempId = `temp-${Date.now()}`;
-
       const placeholder: DocumentItem = {
         id: tempId,
         name: file.name,
@@ -181,6 +201,9 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     pushToast,
     toasts,
     removeToast,
+    clearAllData,
+    searchQuery,
+    setSearchQuery,
   };
 
   return (
